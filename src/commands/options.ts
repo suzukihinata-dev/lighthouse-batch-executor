@@ -36,7 +36,8 @@ export function addMeasureOptions(cmd: Command): Command {
     .option('--output <path>', '出力 CSV のパス')
     .option('--bom', 'CSV に BOM を付ける (Excel 対策)', false)
     .option('--allow-external-hosts', 'sitemap 内の外部ホスト URL を計測する', false)
-    .option('--output-dir <dir>', '出力ディレクトリのルート', DEFAULTS.outputDir);
+    .option('--output-dir <dir>', '出力ディレクトリのルート', DEFAULTS.outputDir)
+    .option('--view', '終了後に診断結果 HTML (report.html) を生成する', false);
 }
 
 /** URL 収集 (urls) 用の絞り込みオプション。 */

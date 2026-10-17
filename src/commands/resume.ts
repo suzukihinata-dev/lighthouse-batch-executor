@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { buildRunConfig, loadFileConfig, type FileConfig } from '../config-file.js';
 import { runPipeline } from '../pipeline.js';
 import { latestRunId } from '../output/state.js';
+import { generateReport } from '../view/report.js';
 import { addMeasureOptions, explicitOptions } from './options.js';
 
 function resolveRunId(specified: string | undefined, outputDir: string): string {
@@ -58,6 +59,10 @@ export function buildResumeCommand(): Command {
 
     const config = buildRunConfig({ file, cli, urls, resumeFrom: runId });
     await runPipeline(config);
+    if (cli['view']) {
+      const dest = await generateReport(config.runId, config.outputDir, config.output);
+      console.log(`診断結果 HTML を生成しました: ${dest}`);
+    }
   });
   return cmd;
 }

@@ -4,6 +4,7 @@
 import { Command } from 'commander';
 import { buildRunConfig, loadFileConfig } from '../config-file.js';
 import { runPipeline } from '../pipeline.js';
+import { generateReport } from '../view/report.js';
 import { addFilterOptions, addMeasureOptions, explicitOptions } from './options.js';
 
 export function buildRunCommand(): Command {
@@ -24,6 +25,10 @@ export function buildRunCommand(): Command {
     const file = configPath ? await loadFileConfig(configPath) : undefined;
     const config = buildRunConfig({ file, cli });
     await runPipeline(config);
+    if (cli['view']) {
+      const dest = await generateReport(config.runId, config.outputDir, config.output);
+      console.log(`診断結果 HTML を生成しました: ${dest}`);
+    }
   });
   return cmd;
 }

@@ -8,6 +8,7 @@
  *   lighthouse-batch resume [runId]
  *   lighthouse-batch list
  *   lighthouse-batch show <runId>
+ *   lighthouse-batch view <runId>              # 診断結果 HTML を生成
  */
 import { Command } from 'commander';
 import { realpathSync } from 'node:fs';
@@ -16,6 +17,7 @@ import { buildRunCommand } from './commands/run.js';
 import { buildUrlsCommand } from './commands/urls.js';
 import { buildResumeCommand } from './commands/resume.js';
 import { buildListCommand, buildShowCommand } from './commands/inspect.js';
+import { buildViewCommand } from './commands/view.js';
 
 export function buildProgram(): Command {
   const program = new Command();
@@ -31,6 +33,7 @@ export function buildProgram(): Command {
   program.addCommand(buildResumeCommand());
   program.addCommand(buildListCommand());
   program.addCommand(buildShowCommand());
+  program.addCommand(buildViewCommand());
   return program;
 }
 

@@ -70,10 +70,14 @@ lighthouse-batch run --site https://example.com
 | `resume [runId]` | 中断した実行を再開 (実行 ID 省略時は最新)。`--site` は不要 |
 | `list`           | 出力ディレクトリ内の実行一覧と進捗を表示                   |
 | `show <runId>`   | 指定した実行の設定・結果サマリ・エラー一覧を表示           |
+| `view <runId>`   | 実行結果 (results.csv) から診断結果 HTML を生成する        |
 
 ```sh
 # 設定ファイルで実行
 lighthouse-batch run --config batch.json
+
+# 計測と同時に診断結果 HTML まで生成
+lighthouse-batch run --site https://example.com --view
 
 # 中断からの再開 (Ctrl+C した後など)
 lighthouse-batch resume                  # 最新の実行
@@ -82,7 +86,22 @@ lighthouse-batch resume 20261017-183000
 # 実行の一覧と結果の確認
 lighthouse-batch list
 lighthouse-batch show 20261017-183000
+
+# 診断結果 HTML の生成
+lighthouse-batch view 20261017-183000                    # output/<runId>/report.html へ
+lighthouse-batch view 20261017-183000 --out report.html  # パス指定
 ```
+
+## 診断結果 HTML (`view` / `--view`)
+
+`results.csv` の全行を単一の HTML ファイルに埋め込んだビューアーです。外部リソースを一切読み込まないため、生成された `report.html` はそのままブラウザで開け、チームへの配布もできます。
+
+- **サマリ**: ok / partial / error の件数
+- **一覧表**: URL、strategy、status、4 カテゴリスコア (色分け)、FCP / LCP / TBT / CLS、失敗 audit 数
+- **操作**: URL 検索、strategy / status での絞り込み、列クリックでソート
+- **行の詳細** (行をクリック): 全メトリクス、final_url、`raw_path`、エラー内容、失敗 audit 一覧、Opportunities (節約時間・容量・対象件数)、Diagnostics
+
+CSV の再生成や監査の再確認には `raw/` の生 JSON (F6) を使ってください。
 
 `--help` を付けると各コマンドのオプション一覧が表示されます。
 
@@ -142,6 +161,7 @@ Bot 対策の突破 (CAPTCHA の回避など) は行いません。弾かれた 
 ```text
 output/<実行ID>/            # 実行 ID は YYYYMMDD-HHmmss
 ├─ results.csv              # 最終成果物 (1 行 = 1 (URL, strategy) の中央値結果)
+├─ report.html              # 診断結果 HTML (view / --view で生成)
 ├─ columns.json             # 確定した列定義 (resume 時に再利用)
 ├─ config.json              # 実行時の設定 (機密値を除く。resume が再利用)
 ├─ state.jsonl              # 完了した (URL, strategy) の記録 (resume 用)

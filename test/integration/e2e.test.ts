@@ -227,7 +227,7 @@ describe('end to end', () => {
         expect(readFileSync(statePath, 'utf8').trim().split('\n')).toHaveLength(2);
         expect(readFileSync(resultsPath, 'utf8').trim().split('\n')).toHaveLength(3); // header + 2
 
-        // list / show
+        // list / show / view
         logs.length = 0;
         await main(['node', 'cli', 'list', '--output-dir', outRoot]);
         expect(logs.some((l) => l.includes(runId))).toBe(true);
@@ -235,6 +235,14 @@ describe('end to end', () => {
         await main(['node', 'cli', 'show', runId, '--output-dir', outRoot]);
         expect(logs.some((l) => l.includes('--- 設定 ---'))).toBe(true);
         expect(logs.some((l) => l.includes('ok: 2'))).toBe(true);
+        logs.length = 0;
+        await main(['node', 'cli', 'view', runId, '--output-dir', outRoot]);
+        const reportPath = join(runDir, 'report.html');
+        expect(existsSync(reportPath)).toBe(true);
+        const report = readFileSync(reportPath, 'utf8');
+        expect(report).toContain('ok: 2');
+        expect(report).toContain('url'); // ヘッダー
+        expect(logs.some((l) => l.includes(reportPath))).toBe(true);
       } finally {
         logSpy.mockRestore();
       }
