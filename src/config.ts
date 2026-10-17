@@ -14,8 +14,10 @@ export interface AuthConfig {
 }
 
 export interface RunConfig {
-  /** 計測対象サイトのルート URL、または sitemap.xml の URL */
-  site: string;
+  /** 計測対象サイトのルート URL、または sitemap.xml の URL (urls 指定時は省略可) */
+  site?: string;
+  /** 事前収集済みの URL 一覧 (resume など。指定時は sitemap 収集をスキップ) */
+  urls?: string[];
   /** sitemap の URL を明示指定した場合 */
   sitemap?: string;
   /** 計測対象の strategy 一覧 (既定: both → [mobile, desktop]) */
@@ -106,6 +108,9 @@ export function parseHeader(spec: string): [string, string] {
 }
 
 export function validateConfig(config: RunConfig): void {
+  if (!config.site && !config.urls) {
+    throw new ConfigError('--site (または設定ファイルの site) が必要です');
+  }
   if (config.runs < 1) throw new ConfigError('--runs は 1 以上を指定してください');
   if (config.concurrency < 1) throw new ConfigError('--concurrency は 1 以上を指定してください');
   if (config.retries < 0) throw new ConfigError('--retries は 0 以上を指定してください');

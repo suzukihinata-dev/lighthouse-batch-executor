@@ -2,13 +2,14 @@
  * 結合テスト: ローカルの静的サーバー (sitemap 付き) を立てて実際に Lighthouse を実行する。
  * 遅いため `npm run test:integration` で手動実行する。
  */
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, existsSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { runPipeline } from '../../src/pipeline.js';
+import { main } from '../../src/cli.js';
 import { formatRunId } from '../../src/config.js';
 
 const PAGES: Record<string, string> = {
@@ -163,6 +164,80 @@ describe('end to end', () => {
       // F2-8: state.jsonl
       const state = readFileSync(join(runDir, 'state.jsonl'), 'utf8').trim().split('\n');
       expect(state).toHaveLength(3);
+
+      // ---- config.json (機密情報を含まない設定の書き戻し) ----
+      const echo = JSON.parse(readFileSync(join(runDir, 'config.json'), 'utf8'));
+      expect(echo.site).toBe(origin);
+      expect(echo.sitemap).toBe(`${origin}/sitemap.xml`);
+      expect(echo.runs).toBe(2);
+      expect(JSON.stringify(echo)).not.toContain('Authorization');
+    } finally {
+      rmSync(outRoot, { recursive: true, force: true });
+    }
+  }, 600_000);
+
+  it('urls / resume / list / show サブコマンドが動作する (AC5)', async () => {
+    const outRoot = mkdtempSync(join(tmpdir(), 'lhe-cli-'));
+    try {
+      const logs: string[] = [];
+      const logSpy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+        logs.push(args.map(String).join(' '));
+      });
+      try {
+        // urls: 収集のみ (計測しない)
+        await main(['node', 'cli', 'urls', '--site', `${origin}/sitemap.xml`, '--limit', '2']);
+        const printed = logs.filter((l) => l.startsWith(origin));
+        expect(printed).toHaveLength(2);
+
+        // run: 2 URL × mobile × 1 run を実行
+        await main([
+          'node',
+          'cli',
+          'run',
+          '--site',
+          `${origin}/sitemap.xml`,
+          '--strategy',
+          'mobile',
+          '--runs',
+          '1',
+          '--limit',
+          '2',
+          '--output-dir',
+          outRoot,
+        ]);
+        const runId = readdirSync(outRoot).filter((n) => /^\d{8}-\d{6}$/.test(n))[0]!;
+        const runDir = join(outRoot, runId);
+        const statePath = join(runDir, 'state.jsonl');
+        const resultsPath = join(runDir, 'results.csv');
+        expect(readFileSync(statePath, 'utf8').trim().split('\n')).toHaveLength(2);
+
+        // 1 件を未完了に戻す (中断をシミュレート)
+        const stateLines = readFileSync(statePath, 'utf8').trim().split('\n');
+        writeFileSync(statePath, stateLines[0]! + '\n', 'utf8');
+        const resultLines = readFileSync(resultsPath, 'utf8').trim().split('\n');
+        writeFileSync(resultsPath, resultLines.slice(0, 2).join('\n') + '\n', 'utf8');
+
+        // resume: 残り 1 件だけが実行される
+        const errSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+        try {
+          await main(['node', 'cli', 'resume', runId, '--output-dir', outRoot]);
+        } finally {
+          errSpy.mockRestore();
+        }
+        expect(readFileSync(statePath, 'utf8').trim().split('\n')).toHaveLength(2);
+        expect(readFileSync(resultsPath, 'utf8').trim().split('\n')).toHaveLength(3); // header + 2
+
+        // list / show
+        logs.length = 0;
+        await main(['node', 'cli', 'list', '--output-dir', outRoot]);
+        expect(logs.some((l) => l.includes(runId))).toBe(true);
+        logs.length = 0;
+        await main(['node', 'cli', 'show', runId, '--output-dir', outRoot]);
+        expect(logs.some((l) => l.includes('--- 設定 ---'))).toBe(true);
+        expect(logs.some((l) => l.includes('ok: 2'))).toBe(true);
+      } finally {
+        logSpy.mockRestore();
+      }
     } finally {
       rmSync(outRoot, { recursive: true, force: true });
     }

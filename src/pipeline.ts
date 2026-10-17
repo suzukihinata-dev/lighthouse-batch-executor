@@ -6,6 +6,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import pLimit from 'p-limit';
 import { type RunConfig, type Strategy } from './config.js';
+import { toFileConfig } from './config-file.js';
 import { collectUrls } from './sitemap/collect.js';
 import type { FetchResult, FetchText } from './sitemap/discover.js';
 import { filterUrls } from './url/filter.js';
@@ -26,7 +27,7 @@ import {
   saveColumnDefinition,
   type ColumnDefinition,
 } from './output/columns.js';
-import { CsvWriter } from './output/csv.js';
+import { CsvWriter, parseCsvLine } from './output/csv.js';
 import { RawStore } from './output/raw.js';
 import { StateStore, stateKey } from './output/state.js';
 import { Logger } from './logger.js';
@@ -42,37 +43,6 @@ export const defaultFetchText: FetchText = async (url: string): Promise<FetchRes
   const buffer = Buffer.from(await res.arrayBuffer());
   return { ok: true, status: res.status, body: buffer.toString('utf8'), buffer };
 };
-
-/** RFC 4180 を前提とした 1 行の解析 (resume 時の重複除去用)。 */
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]!;
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      fields.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  fields.push(current);
-  return fields;
-}
 
 /** resume 時に、state.jsonl に記録されていない行を results.csv から除去する (5.4)。 */
 function dedupeResultsCsv(csvPath: string, done: Set<string>): void {
@@ -115,25 +85,38 @@ export async function runPipeline(
   const logger = new Logger(join(runDir, 'run.log'), secrets);
 
   // ---- F1: URL 収集 ----
-  const collected = await collectUrls(config.sitemap ?? config.site, fetchText, {
-    allowExternalHosts: config.allowExternalHosts,
-  });
-  if (collected.externalSkipped.length > 0) {
-    const note = `外部ホストのため除外: ${collected.externalSkipped.length} 件 (--allow-external-hosts で計測可能)`;
-    process.stderr.write(`警告: ${note}\n`);
-    logger.log(note);
+  let urls: string[];
+  if (config.urls) {
+    // 事前収集済み (resume や urls.txt 流用) の場合は sitemap 収集をスキップする
+    urls = config.urls;
+    process.stderr.write(`URL 一覧 (指定済み): ${urls.length} 件\n`);
+  } else {
+    const collected = await collectUrls(config.sitemap ?? config.site!, fetchText, {
+      allowExternalHosts: config.allowExternalHosts,
+    });
+    if (collected.externalSkipped.length > 0) {
+      const note = `外部ホストのため除外: ${collected.externalSkipped.length} 件 (--allow-external-hosts で計測可能)`;
+      process.stderr.write(`警告: ${note}\n`);
+      logger.log(note);
+    }
+    urls = filterUrls(collected.urls, {
+      include: config.include,
+      exclude: config.exclude,
+      limit: config.limit,
+    });
+    process.stderr.write(
+      `URL 収集: ${collected.urls.length} 件 (重複除去後)、絞り込み後 ${urls.length} 件\n`,
+    );
   }
-  const urls = filterUrls(collected.urls, {
-    include: config.include,
-    exclude: config.exclude,
-    limit: config.limit,
-  });
   if (urls.length === 0) {
     throw new Error('計測対象の URL がありません (include/exclude/limit を確認してください)');
   }
   await fs.writeFile(join(runDir, 'urls.txt'), urls.join('\n') + '\n', 'utf8');
-  process.stderr.write(
-    `URL 収集: ${collected.urls.length} 件 (重複除去後)、絞り込み後 ${urls.length} 件\n`,
+  // 実行時の設定を (機密値を除いて) 書き戻す。resume と再実行に使う (F6 の再現性)
+  await fs.writeFile(
+    join(runDir, 'config.json'),
+    JSON.stringify(toFileConfig(config), null, 2) + '\n',
+    'utf8',
   );
 
   // ---- F2-8: resume ----
@@ -150,6 +133,8 @@ export async function runPipeline(
   }
   if (config.resumeFrom) {
     dedupeResultsCsv(resultsPath, done);
+    // 既存の results.csv へ追記する (ヘッダーを書き直して既存行を消さない)
+    if (existsSync(resultsPath)) csvWriter.continueExisting();
   }
 
   const rawStore = config.noRaw ? null : new RawStore(join(runDir, 'raw'));

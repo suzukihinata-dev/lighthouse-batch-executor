@@ -20,55 +20,81 @@ npm run build
 
 ## 使い方
 
-```sh
-node dist/cli.js --site https://example.com
-```
-
-指定サイトの `/sitemap.xml` (または robots.txt の `Sitemap:` 記述) から URL を収集し、各 URL をモバイル・デスクトップの両方で 3 回ずつ計測して、中央値を集約した `output/<実行ID>/results.csv` に出力します。
-
-### オプション一覧
-
-| オプション | 既定 | 説明 |
-| --- | --- | --- |
-| `--site <url>` | (必須) | サイトのルート URL または sitemap.xml の URL |
-| `--sitemap <url>` | - | sitemap.xml の URL を明示指定 |
-| `--strategy <type>` | `both` | `mobile` / `desktop` / `both` |
-| `--runs <n>` | `3` | 1 (URL, strategy) あたりの計測回数 |
-| `--concurrency <n>` | `1` | 並列数 (既定は直列。並列化すると計測値がぶれる可能性あり) |
-| `--retries <n>` | `2` | リトライ回数 |
-| `--delay <ms>` | `0` | URL 間の待機ミリ秒 |
-| `--timeout <ms>` | `120000` | 1 計測のタイムアウト |
-| `--include <pattern...>` | - | 対象に含める URL の glob パターン (パスまたは URL 全体に一致) |
-| `--exclude <pattern...>` | - | 対象から除外する URL の glob パターン |
-| `--limit <n>` | - | 計測する最大 URL 数 (動作確認用) |
-| `--header <header...>` | - | 追加 HTTP ヘッダー (`"Name: value"`) |
-| `--user-agent <ua>` | - | User-Agent の上書き |
-| `--no-raw` | - | 生 JSON の保存を行わない |
-| `--output <path>` | `output/<実行ID>/results.csv` | 出力 CSV のパス |
-| `--bom` | - | CSV に BOM を付ける (Excel 対策) |
-| `--resume [runId]` | - | 中断した実行を再開 (実行 ID 省略時は最新) |
-| `--allow-external-hosts` | - | sitemap 内の外部ホスト URL も計測する (既定は警告の上、除外) |
-| `--output-dir <dir>` | `output` | 出力ディレクトリのルート |
-
-### ベーシック認証
-
-認証情報は CLI 引数ではなく環境変数で渡します (シェル履歴・プロセス一覧への露出を避けるため)。
+サブコマンド形式の CLI です。
 
 ```sh
-BASIC_AUTH_USER=user BASIC_AUTH_PASSWORD=pass node dist/cli.js --site https://staging.example.com
+node dist/cli.js run --site https://example.com
 ```
 
-認証情報・ヘッダーの値はログ・CSV・生 JSON に出力されません (`***` へマスク / 保存前に除去)。
+`run` は指定サイトの `/sitemap.xml` (または robots.txt の `Sitemap:` 記述) から URL を収集し、各 URL をモバイル・デスクトップの両方で 3 回ずつ計測して、中央値を集約した `output/<実行ID>/results.csv` に出力します。
 
-### 中断からの再開
+### サブコマンド一覧
+
+| コマンド | 説明 |
+| --- | --- |
+| `run` | URL 収集から計測・CSV 出力までの全体実行 |
+| `urls` | URL 収集のみ (計測しない)。動作確認に使う |
+| `resume [runId]` | 中断した実行を再開 (実行 ID 省略時は最新)。`--site` は不要 |
+| `list` | 出力ディレクトリ内の実行一覧と進捗を表示 |
+| `show <runId>` | 指定した実行の設定・結果サマリ・エラー一覧を表示 |
 
 ```sh
-# Ctrl+C などで中断した後:
-node dist/cli.js --site https://example.com --resume           # 最新の実行を再開
-node dist/cli.js --site https://example.com --resume 20261017-183000
+# 動作確認 (URL 収集だけ)
+node dist/cli.js urls --site https://example.com --limit 5
+
+# 小規模に計測
+node dist/cli.js run --site https://example.com --limit 5 --runs 1 --strategy mobile
+
+# 設定ファイルで実行
+node dist/cli.js run --config batch.json
+
+# 中断からの再開
+node dist/cli.js resume                  # 最新の実行
+node dist/cli.js resume 20261017-183000
+
+# 実行の一覧と結果の確認
+node dist/cli.js list
+node dist/cli.js show 20261017-183000
 ```
 
-計測済みの (URL, strategy) はスキップされ、残りだけが実行されます。
+### 設定ファイル (`--config`)
+
+JSON 形式で繰り返し使う設定を切り出せます。優先順位は「CLI の明示指定 > 設定ファイル > 既定値」です。機密情報 (ヘッダー値・認証) は設定ファイルに書かず、CLI と環境変数で渡してください。
+
+```json
+{
+  "site": "https://example.com",
+  "runs": 3,
+  "strategy": "both",
+  "include": ["/products/*"],
+  "exclude": ["/private/*"],
+  "delay": 1000
+}
+```
+
+| キー | 型 | 既定 | 説明 |
+| --- | --- | --- | --- |
+| `site` | string | - | サイトのルート URL または sitemap.xml の URL |
+| `sitemap` | string | - | sitemap.xml の URL を明示指定 |
+| `strategy` | string | `both` | `mobile` / `desktop` / `both` |
+| `runs` | number | `3` | 1 (URL, strategy) あたりの計測回数 |
+| `concurrency` | number | `1` | 並列数 (既定は直列。並列化すると計測値がぶれる可能性あり) |
+| `retries` | number | `2` | リトライ回数 |
+| `delay` | number | `0` | URL 間の待機ミリ秒 |
+| `timeout` | number | `120000` | 1 計測のタイムアウト (ミリ秒) |
+| `include` | string[] | - | 対象に含める URL の glob パターン |
+| `exclude` | string[] | - | 対象から除外する URL の glob パターン |
+| `limit` | number | - | 計測する最大 URL 数 |
+| `userAgent` | string | - | User-Agent の上書き |
+| `noRaw` | boolean | `false` | 生 JSON の保存を行わない |
+| `output` | string | `output/<実行ID>/results.csv` | 出力 CSV のパス |
+| `bom` | boolean | `false` | CSV に BOM を付ける (Excel 対策) |
+| `allowExternalHosts` | boolean | `false` | sitemap 内の外部ホスト URL も計測する |
+| `outputDir` | string | `output` | 出力ディレクトリのルート |
+
+CLI オプションは設定ファイルのキーに対応します (`delay` → `--delay`、`userAgent` → `--user-agent`)。計測系 (`run` / `resume`) では `--header "Name: value"` も使えます。
+
+実行時の設定は (機密情報を除いて) 各実行ディレクトリに `config.json` として保存され、`resume` はこれを再利用します。
 
 ## 出力
 
@@ -76,6 +102,7 @@ node dist/cli.js --site https://example.com --resume 20261017-183000
 output/<実行ID>/            # 実行 ID は YYYYMMDD-HHmmss
 ├─ results.csv              # 最終成果物 (1 行 = 1 (URL, strategy) の中央値結果)
 ├─ columns.json             # 確定した列定義 (resume 時に再利用)
+├─ config.json              # 実行時の設定 (機密値を除く。resume が再利用)
 ├─ state.jsonl              # 完了した (URL, strategy) の記録 (resume 用)
 ├─ urls.txt                 # 収集した URL 一覧
 ├─ run.log                  # 詳細ログ (機密値はマスク済み)
