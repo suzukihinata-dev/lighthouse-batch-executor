@@ -1,0 +1,103 @@
+{
+  "fetchTime": "2026-10-17T09:00:00.000Z",
+  "finalDisplayedUrl": "https://example.com/page-a",
+  "finalUrl": "https://example.com/page-a",
+  "lighthouseVersion": "12.8.2",
+  "requestedUrl": "https://example.com/page-a",
+  "categories": {
+    "performance": { "id": "performance", "score": 0.85 },
+    "accessibility": { "id": "accessibility", "score": 0.92 },
+    "best-practices": { "id": "best-practices", "score": 1.0 },
+    "seo": { "id": "seo", "score": 0.9 }
+  },
+  "audits": {
+    "first-contentful-paint": {
+      "id": "first-contentful-paint",
+      "score": 0.78,
+      "numericValue": 1800,
+      "displayValue": "1.8 s"
+    },
+    "largest-contentful-paint": {
+      "id": "largest-contentful-paint",
+      "score": 0.6,
+      "numericValue": 2900,
+      "displayValue": "2.9 s"
+    },
+    "total-blocking-time": {
+      "id": "total-blocking-time",
+      "score": 0.9,
+      "numericValue": 250
+    },
+    "cumulative-layout-shift": {
+      "id": "cumulative-layout-shift",
+      "score": 0.95,
+      "numericValue": 0.05
+    },
+    "server-response-time": {
+      "id": "server-response-time",
+      "score": 0.9,
+      "numericValue": 320
+    },
+    "render-blocking-resources": {
+      "id": "render-blocking-resources",
+      "score": 0.5,
+      "numericValue": 800,
+      "displayValue": "Potential savings of 800 ms",
+      "details": {
+        "type": "opportunity",
+        "overallSavingsMs": 800,
+        "items": [
+          { "url": "https://example.com/style.css", "wastedMs": 500 },
+          { "url": "https://cdn.example.com/font.css", "wastedMs": 300 }
+        ]
+      }
+    },
+    "unused-javascript": {
+      "id": "unused-javascript",
+      "score": 0.7,
+      "numericValue": 40000,
+      "details": {
+        "type": "opportunity",
+        "overallSavingsBytes": 40000,
+        "overallSavingsMs": 100,
+        "items": [{ "url": "https://example.com/app.js", "wastedBytes": 40000 }]
+      }
+    },
+    "mainthread-work-breakdown": {
+      "id": "mainthread-work-breakdown",
+      "score": 0.8,
+      "numericValue": 1500,
+      "group": "diagnostics",
+      "displayValue": "1.5 s",
+      "details": {
+        "type": "table",
+        "items": [{ "group": "scriptEvaluation", "duration": 900 }]
+      }
+    },
+    "network-requests": {
+      "id": "network-requests",
+      "score": 1,
+      "group": "diagnostics",
+      "details": {
+        "type": "table",
+        "items": [{ "url": "https://example.com/style.css" }]
+      }
+    },
+    "uses-long-cache-ttl": {
+      "id": "uses-long-cache-ttl",
+      "score": 0.4,
+      "numericValue": 100000,
+      "group": "diagnostics",
+      "displayValue": "100 KiB",
+      "details": {
+        "type": "opportunity",
+        "overallSavingsBytes": 100000,
+        "items": [{ "url": "https://example.com/logo.png" }]
+      }
+    }
+  },
+  "configSettings": {
+    "extraHeaders": { "Authorization": "Basic c2VjcmV0" },
+    "formFactor": "mobile"
+  }
+}

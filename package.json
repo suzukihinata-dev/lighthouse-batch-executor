@@ -1,0 +1,41 @@
+{
+  "name": "lighthouse-batch-executor",
+  "version": "0.1.0",
+  "description": "Run Lighthouse against every URL in a site's sitemap and export the results to CSV.",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "lighthouse-batch": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsc -p tsconfig.build.json",
+    "start": "node dist/cli.js",
+    "test": "vitest run test/unit",
+    "test:integration": "vitest run test/integration",
+    "lint": "eslint src test && prettier --check src test",
+    "format": "prettier --write src test"
+  },
+  "dependencies": {
+    "chrome-launcher": "^1.1.2",
+    "commander": "^12.1.0",
+    "fast-xml-parser": "^4.5.1",
+    "lighthouse": "^12.2.1",
+    "picomatch": "^4.0.2",
+    "p-limit": "^6.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.14.0",
+    "@types/node": "^22.9.0",
+    "@types/picomatch": "^3.0.1",
+    "eslint": "^9.14.0",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.14.0",
+    "vitest": "^2.1.4"
+  }
+}
