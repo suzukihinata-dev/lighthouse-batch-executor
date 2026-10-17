@@ -163,6 +163,38 @@ describe('toViewRows', () => {
   });
 });
 
+describe('埋め込み関数 (ブラウザー側スクリプト)', () => {
+  it('squarify / scoreColor / textOn / overallScore が自己完結していて単体で動く', () => {
+    const html = buildReportHtml([makeRow({})], { runId: 'r', generatedAt: 't' });
+    // 埋め込み関数だけを抜き出して、依存なしで実行できることを確認する
+    const embedded = [
+      'function squarify(',
+      'function scoreColor(',
+      'function textOn(',
+      'function overallScore(',
+    ].every((prefix) => html.includes(prefix));
+    expect(embedded).toBe(true);
+    const src = html.slice(html.indexOf('function squarify(')).split('const METRICS')[0]!;
+    const fns = new Function(
+      src +
+        '\nreturn { squarify: squarify, scoreColor: scoreColor, textOn: textOn, overallScore: overallScore };',
+    )() as {
+      squarify: (typeof import('../../src/view/treemap.js'))['squarify'];
+      scoreColor: (s: number | null) => string;
+      textOn: (bg: string) => string;
+      overallScore: (s: Record<string, number | null>) => number | null;
+    };
+    const rects = fns.squarify([1, 1, 2], 200, 100);
+    expect(rects).toHaveLength(3);
+    expect(fns.scoreColor(0)).toBe('#c0392b');
+    expect(fns.scoreColor(100)).toBe('#1e8449');
+    expect(fns.textOn('#d9a11d')).toBe('#1c1c1e');
+    expect(
+      fns.overallScore({ performance: 80, accessibility: 90, best_practices: 70, seo: 100 }),
+    ).toBe(85);
+  });
+});
+
 describe('generateReport', () => {
   it('results.csv から report.html を生成する', async () => {
     const outRoot = mkdtempSync(join(tmpdir(), 'lhe-view-'));

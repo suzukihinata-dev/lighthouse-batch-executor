@@ -7,6 +7,7 @@
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import { readCsv, type CsvTable } from '../output/csv.js';
+import { overallScore, scoreColor, squarify, textOn } from './treemap.js';
 
 export interface ViewDetailItem {
   id: string;
@@ -169,6 +170,22 @@ dd { margin: 0; overflow-wrap: anywhere; }
 table.inner { width: auto; }
 table.inner th, table.inner td { text-align: left; }
 footer { padding: 12px 20px; color: gray; font-size: 12px; }
+section.map { padding: 4px 20px 0; }
+.map-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.map-head h2 { font-size: 14px; margin: 8px 0; }
+.map-head select { padding: 4px 8px; font-size: 13px; }
+.legend { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-left: auto; }
+.legend .bar { width: 140px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #c0392b, #d9a11d 50%, #1e8449); }
+.legend .none { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #8e8e93; vertical-align: -2px; }
+#map { position: relative; height: 420px; margin-top: 6px; }
+#map .tile { position: absolute; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(127,127,127,.25); }
+#map .tile .sc { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+#map .tile .u { font-size: 11px; opacity: .85; max-width: 94%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#map .tile:hover { outline: 2px solid #888; z-index: 2; }
+#tip { position: fixed; display: none; pointer-events: none; background: canvas; color: canvastext; border: 1px solid #8886; border-radius: 6px; padding: 6px 10px; font-size: 12px; z-index: 10; max-width: 360px; box-shadow: 0 2px 8px #0003; }
+#tip .u { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+#map-detail { margin: 8px 0 0; padding: 10px 14px; border: 1px solid #8884; border-radius: 8px; }
+#map-detail:empty { display: none; }
 </style>
 </head>
 <body>
@@ -185,6 +202,24 @@ footer { padding: 12px 20px; color: gray; font-size: 12px; }
   <select id="f-status"><option value="">全 status</option><option>ok</option><option>partial</option><option>error</option></select>
   <span id="count"></span>
 </div>
+<section class="map" aria-label="総合得点マップ">
+  <div class="map-head">
+    <h2>総合得点マップ (4 カテゴリ スコアの平均)</h2>
+    <label>サイズ:
+      <select id="map-size">
+        <option value="equal">均等</option>
+        <option value="bytes">ページ容量</option>
+        <option value="savings">改善の余地 (合計節約 ms)</option>
+      </select>
+    </label>
+    <div class="legend">
+      <span>0</span><span class="bar"></span><span>100</span>
+      <span class="none" title="エラー / 採点なし"></span><span>エラー</span>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div id="map-detail"></div>
+</section>
 <main>
 <table id="tbl">
 <thead><tr>
@@ -199,8 +234,14 @@ footer { padding: 12px 20px; color: gray; font-size: 12px; }
 </table>
 </main>
 <footer>このファイルは単体で動作します (外部リソースなし)。元データ: results.csv / raw/</footer>
+<div id="tip"></div>
 <script>
 const DATA = ${embedJson(rows)};
+// 純粋関数は src/view/treemap.ts から .toString() で埋め込む (単体テスト対象)
+${squarify.toString()}
+${scoreColor.toString()}
+${textOn.toString()}
+${overallScore.toString()}
 const METRICS = [
   ['fcp_ms', 'FCP'], ['lcp_ms', 'LCP'], ['tbt_ms', 'TBT'], ['cls', 'CLS'],
   ['speed_index_ms', 'Speed Index'], ['tti_ms', 'TTI'], ['ttfb_ms', 'TTFB'],
@@ -231,15 +272,15 @@ function cmp(a, b) {
   if (typeof av === 'number' && typeof bv === 'number') return av - bv;
   return String(av).localeCompare(String(bv));
 }
-function detailHtml(row) {
+function detailInner(row) {
   var m = METRICS.map(function (pair) {
     var k = pair[0], label = pair[1];
     var text = k === 'total_byte_weight' ? fmtBytes(row.metrics[k]) : k === 'cls' ? fmtNum(row.metrics[k]) : fmtMs(row.metrics[k]);
     return '<dt>' + label + '</dt><dd>' + text + '</dd>';
   }).join('');
-  var html = '<tr class="detail-row"><td colspan="12">';
-  html += '<dl>' +
+  var html = '<dl>' +
     '<dt>status</dt><dd class="status ' + row.status + '">' + row.status + '</dd>' +
+    '<dt>総合得点</dt><dd>' + (overallScore(row.scores) == null ? '—' : overallScore(row.scores)) + ' / 100</dd>' +
     '<dt>runs</dt><dd>' + row.runsSucceeded + ' / ' + row.runsTotal + '</dd>' +
     '<dt>final_url</dt><dd>' + esc(row.finalUrl) + '</dd>' +
     '<dt>fetched_at</dt><dd>' + esc(row.fetchedAt) + '</dd>' +
@@ -262,16 +303,86 @@ function detailHtml(row) {
       row.diagnostics.map(function (d) { return '<li>' + esc(d.id) + (d.displayValue ? ' — ' + esc(d.displayValue) : '') + '</li>'; }).join('') +
       '</ul>';
   }
-  html += '</td></tr>';
   return html;
 }
-function render() {
+function detailHtml(row) {
+  return '<tr class="detail-row"><td colspan="12">' + detailInner(row) + '</td></tr>';
+}
+function currentRows() {
   var q = document.getElementById('q').value.trim().toLowerCase();
   var fs = document.getElementById('f-strategy').value;
   var fst = document.getElementById('f-status').value;
-  var rows = DATA.filter(function (r) {
+  return DATA.filter(function (r) {
     return (!q || r.url.toLowerCase().indexOf(q) >= 0) && (!fs || r.strategy === fs) && (!fst || r.status === fst);
   });
+}
+function tileValue(row) {
+  var mode = document.getElementById('map-size').value;
+  if (mode === 'bytes') return Math.max(row.metrics.total_byte_weight || 0, 1);
+  if (mode === 'savings') {
+    var sum = 0;
+    row.opportunities.forEach(function (o) { sum += o.overallSavingsMs || 0; });
+    return Math.max(sum, 1);
+  }
+  return 1;
+}
+function shortUrl(url) {
+  try {
+    var u = new URL(url);
+    return (u.pathname === '/' ? '/' : u.pathname) + u.search;
+  } catch (e) { return url; }
+}
+function tipHtml(row) {
+  var s = row.scores;
+  function cell(v) { return v == null ? '—' : v; }
+  return '<div class="u">' + esc(row.url) + '</div>' +
+    '<div>' + esc(row.strategy) + ' ・ ' + row.status + ' ・ 総合 ' + (overallScore(s) == null ? '—' : overallScore(s)) + '</div>' +
+    '<div>Perf ' + cell(s.performance) + ' / A11y ' + cell(s.accessibility) + ' / BP ' + cell(s.best_practices) + ' / SEO ' + cell(s.seo) + '</div>' +
+    (row.error ? '<div>' + esc(row.error.slice(0, 80)) + '</div>' : '');
+}
+function renderMap() {
+  var map = document.getElementById('map');
+  var rows = currentRows();
+  map.innerHTML = '';
+  if (rows.length === 0) { map.textContent = '該当する行がありません'; return; }
+  var W = map.clientWidth || 800;
+  var H = map.clientHeight || 420;
+  var rects = squarify(rows.map(tileValue), W, H);
+  var tip = document.getElementById('tip');
+  rects.forEach(function (rect, i) {
+    var row = rows[i];
+    var score = overallScore(row.scores);
+    var bg = scoreColor(score);
+    var fg = textOn(bg);
+    var tile = document.createElement('div');
+    tile.className = 'tile';
+    tile.style.cssText =
+      'left:' + rect.x + 'px;top:' + rect.y + 'px;width:' + rect.w + 'px;height:' + rect.h + 'px;' +
+      'background:' + bg + ';color:' + fg + ';';
+    var area = rect.w * rect.h;
+    var label = '';
+    if (area >= 2200) {
+      label = '<div class="sc">' + (score == null ? '—' : score) + '</div>';
+      if (area >= 5200) label += '<div class="u">' + esc(shortUrl(row.url)) + '</div>';
+      if (area >= 9000 && row.strategy) label += '<div class="u">' + esc(row.strategy) + '</div>';
+    }
+    tile.innerHTML = label;
+    tile.addEventListener('mousemove', function (ev) {
+      tip.style.display = 'block';
+      tip.innerHTML = tipHtml(row);
+      var x = Math.min(ev.clientX + 14, window.innerWidth - 380);
+      tip.style.left = x + 'px';
+      tip.style.top = (ev.clientY + 16) + 'px';
+    });
+    tile.addEventListener('mouseleave', function () { tip.style.display = 'none'; });
+    tile.addEventListener('click', function () {
+      document.getElementById('map-detail').innerHTML = detailInner(row);
+    });
+    map.appendChild(tile);
+  });
+}
+function render() {
+  var rows = currentRows();
   if (sortKey) rows = rows.slice().sort(function (a, b) { return sortDesc ? -cmp(a, b) : cmp(a, b); });
   var tbody = document.querySelector('#tbl tbody');
   tbody.innerHTML = rows.map(function (row) {
@@ -306,10 +417,19 @@ document.querySelectorAll('th[data-sort]').forEach(function (th) {
     render();
   });
 });
+function renderAll() {
+  render();
+  renderMap();
+}
 ['q', 'f-strategy', 'f-status'].forEach(function (id) {
-  document.getElementById(id).addEventListener('input', render);
+  document.getElementById(id).addEventListener('input', renderAll);
 });
-render();
+document.getElementById('map-size').addEventListener('change', renderMap);
+window.addEventListener('resize', function () {
+  clearTimeout(window.__mapTimer);
+  window.__mapTimer = setTimeout(renderMap, 150);
+});
+renderAll();
 </script>
 </body>
 </html>
