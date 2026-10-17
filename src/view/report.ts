@@ -174,6 +174,9 @@ section.map { padding: 4px 20px 0; }
 .map-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .map-head h2 { font-size: 14px; margin: 8px 0; }
 .map-head select { padding: 4px 8px; font-size: 13px; }
+.seg { display: inline-flex; border: 1px solid #8886; border-radius: 8px; overflow: hidden; }
+.seg button { border: none; background: transparent; color: canvastext; padding: 4px 14px; font-size: 13px; cursor: pointer; }
+.seg button.on { background: #8883; font-weight: 600; }
 .legend { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-left: auto; }
 .legend .bar { width: 140px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #c0392b, #e6be20 50%, #1e8449); }
 .legend .none { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #8e8e93; vertical-align: -2px; }
@@ -205,6 +208,9 @@ section.map { padding: 4px 20px 0; }
 <section class="map" aria-label="総合得点マップ">
   <div class="map-head">
     <h2>総合得点マップ (4 カテゴリ スコアの平均)</h2>
+    <div class="seg" id="map-strategy" role="tablist" aria-label="strategy の選択">
+      <button type="button" data-v="mobile" class="on" role="tab" aria-selected="true">モバイル</button><button type="button" data-v="desktop" role="tab" aria-selected="false">デスクトップ</button>
+    </div>
     <label>サイズ:
       <select id="map-size">
         <option value="equal">均等</option>
@@ -316,6 +322,15 @@ function currentRows() {
     return (!q || r.url.toLowerCase().indexOf(q) >= 0) && (!fs || r.strategy === fs) && (!fst || r.status === fst);
   });
 }
+// マップは独自の strategy 選択 (モバイル / デスクトップ) を使い、選んだ一方だけ表示する
+var mapStrategy = 'mobile';
+function mapRows() {
+  var q = document.getElementById('q').value.trim().toLowerCase();
+  var fst = document.getElementById('f-status').value;
+  return DATA.filter(function (r) {
+    return r.strategy === mapStrategy && (!q || r.url.toLowerCase().indexOf(q) >= 0) && (!fst || r.status === fst);
+  });
+}
 function tileValue(row) {
   var mode = document.getElementById('map-size').value;
   if (mode === 'bytes') return Math.max(row.metrics.total_byte_weight || 0, 1);
@@ -342,9 +357,9 @@ function tipHtml(row) {
 }
 function renderMap() {
   var map = document.getElementById('map');
-  var rows = currentRows();
+  var rows = mapRows();
   map.innerHTML = '';
-  if (rows.length === 0) { map.textContent = '該当する行がありません'; return; }
+  if (rows.length === 0) { map.textContent = '該当する行がありません (選択中の strategy の結果がありません)'; return; }
   var W = map.clientWidth || 800;
   var H = map.clientHeight || 420;
   var rects = squarify(rows.map(tileValue), W, H);
@@ -364,7 +379,6 @@ function renderMap() {
     if (area >= 2200) {
       label = '<div class="sc">' + (score == null ? '—' : score) + '</div>';
       if (area >= 5200) label += '<div class="u">' + esc(shortUrl(row.url)) + '</div>';
-      if (area >= 9000 && row.strategy) label += '<div class="u">' + esc(row.strategy) + '</div>';
     }
     tile.innerHTML = label;
     tile.addEventListener('mousemove', function (ev) {
@@ -425,6 +439,16 @@ function renderAll() {
   document.getElementById(id).addEventListener('input', renderAll);
 });
 document.getElementById('map-size').addEventListener('change', renderMap);
+document.querySelectorAll('#map-strategy button').forEach(function (btn) {
+  btn.addEventListener('click', function () {
+    mapStrategy = btn.dataset.v;
+    document.querySelectorAll('#map-strategy button').forEach(function (b) {
+      b.classList.toggle('on', b === btn);
+      b.setAttribute('aria-selected', b === btn ? 'true' : 'false');
+    });
+    renderMap();
+  });
+});
 window.addEventListener('resize', function () {
   clearTimeout(window.__mapTimer);
   window.__mapTimer = setTimeout(renderMap, 150);
