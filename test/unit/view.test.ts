@@ -187,8 +187,9 @@ describe('埋め込み関数 (ブラウザー側スクリプト)', () => {
     const rects = fns.squarify([1, 1, 2], 200, 100);
     expect(rects).toHaveLength(3);
     expect(fns.scoreColor(0)).toBe('#c0392b');
-    expect(fns.scoreColor(100)).toBe('#1e8449');
-    expect(fns.textOn('#d9a11d')).toBe('#1c1c1e');
+    expect(fns.scoreColor(90)).toBe('#e6be20');
+    expect(fns.scoreColor(97)).toBe('#1e8449');
+    expect(fns.textOn('#e6be20')).toBe('#1c1c1e');
     expect(
       fns.overallScore({ performance: 80, accessibility: 90, best_practices: 70, seo: 100 }),
     ).toBe(85);

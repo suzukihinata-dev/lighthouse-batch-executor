@@ -83,11 +83,21 @@ export function squarify(values: number[], width: number, height: number): Rect[
   return rects;
 }
 
-/** 総合得点 (0〜100) を色に変換する。null (エラー・採点なし) はグレー。 */
+/**
+ * 色軸のパラメータ: 標準スコア 90 を基準 (イエロー) とし、
+ * 3シグマ = ±7 点の範囲 (83〜97) で赤 ↔ 緑に遷移する。
+ * (ブラウザー埋め込みのため scoreColor 内にも同じ値を literal で持つ)
+ */
+export const SCORE_BASELINE = 90;
+export const SCORE_SIGMA_RANGE = 7;
+
+/** 総合得点を色に変換する。null (エラー・採点なし) はグレー。自己完結形。 */
 export function scoreColor(score: number | null): string {
-  // 色軸のアンカー: 0 点 = 赤、50 点 = 琥珀、100 点 = 緑
+  // 色軸のアンカー: -3σ (83 点以下) = 赤、基準 (90 点) = イエロー、+3σ (97 点以上) = 緑
+  const BASELINE = 90;
+  const SIGMA = 7;
   const RED = [192, 57, 43];
-  const AMBER = [217, 161, 29];
+  const AMBER = [230, 190, 32];
   const GREEN = [30, 132, 73];
 
   function mix(a: number[], b: number[], t: number): string {
@@ -98,8 +108,9 @@ export function scoreColor(score: number | null): string {
   }
 
   if (score === null || !Number.isFinite(score)) return '#8e8e93';
-  const s = Math.max(0, Math.min(100, score));
-  return s < 50 ? mix(RED, AMBER, s / 50) : mix(AMBER, GREEN, (s - 50) / 50);
+  // 基準からの偏差を -1〜+1 に正規化する
+  const t = Math.max(-1, Math.min(1, (score - BASELINE) / SIGMA));
+  return t < 0 ? mix(RED, AMBER, t + 1) : mix(AMBER, GREEN, t);
 }
 
 /** 背景色に対して読める文字色 (黒 / 白) を返す。 */

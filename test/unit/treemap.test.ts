@@ -43,16 +43,21 @@ describe('squarify', () => {
   });
 });
 
-describe('scoreColor (総合得点: 満点グリーン・0 点レッド)', () => {
-  it('0 点は赤、100 点は緑、50 点は琥珀', () => {
-    expect(scoreColor(0)).toBe('#c0392b');
-    expect(scoreColor(100)).toBe('#1e8449');
-    expect(scoreColor(50)).toBe('#d9a11d');
+describe('scoreColor (標準 90 = イエロー、±7 点 = 3σ で赤↔緑)', () => {
+  it('83 点 (−3σ) は赤、90 点 (基準) はイエロー、97 点 (+3σ) は緑', () => {
+    expect(scoreColor(83)).toBe('#c0392b');
+    expect(scoreColor(90)).toBe('#e6be20');
+    expect(scoreColor(97)).toBe('#1e8449');
   });
 
-  it('範囲外はクランプされる', () => {
-    expect(scoreColor(-20)).toBe(scoreColor(0));
-    expect(scoreColor(150)).toBe(scoreColor(100));
+  it('基準以下は赤側にクランプされる', () => {
+    expect(scoreColor(0)).toBe(scoreColor(83));
+    expect(scoreColor(-20)).toBe(scoreColor(83));
+  });
+
+  it('+3σ 以上は緑にクランプされる', () => {
+    expect(scoreColor(150)).toBe(scoreColor(97));
+    expect(scoreColor(100)).toBe('#1e8449');
   });
 
   it('null (エラー・採点なし) はグレー', () => {
@@ -60,13 +65,13 @@ describe('scoreColor (総合得点: 満点グリーン・0 点レッド)', () =>
     expect(scoreColor(Number.NaN)).toBe('#8e8e93');
   });
 
-  it('中間は補間される (赤寄り・緑寄り)', () => {
-    const r = scoreColor(25);
-    const g = scoreColor(75);
-    // 赤成分は 25 点の方が 75 点より多い
-    expect(parseInt(r.slice(1, 3), 16)).toBeGreaterThan(parseInt(g.slice(1, 3), 16));
-    // 緑成分は 75 点の方が多い
-    expect(parseInt(g.slice(3, 5), 16)).toBeGreaterThan(parseInt(r.slice(3, 5), 16));
+  it('基準を挟んで補間される (基準未満は赤寄り、超えは緑寄り)', () => {
+    const below = scoreColor(86);
+    const above = scoreColor(94);
+    // 赤成分は基準未満の方が多い
+    expect(parseInt(below.slice(1, 3), 16)).toBeGreaterThan(parseInt(above.slice(1, 3), 16));
+    // 緑成分は基準超の方が多い
+    expect(parseInt(above.slice(3, 5), 16)).toBeGreaterThan(parseInt(below.slice(3, 5), 16));
   });
 });
 

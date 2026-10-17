@@ -175,7 +175,7 @@ section.map { padding: 4px 20px 0; }
 .map-head h2 { font-size: 14px; margin: 8px 0; }
 .map-head select { padding: 4px 8px; font-size: 13px; }
 .legend { display: flex; align-items: center; gap: 6px; font-size: 12px; margin-left: auto; }
-.legend .bar { width: 140px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #c0392b, #d9a11d 50%, #1e8449); }
+.legend .bar { width: 140px; height: 10px; border-radius: 5px; background: linear-gradient(90deg, #c0392b, #e6be20 50%, #1e8449); }
 .legend .none { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: #8e8e93; vertical-align: -2px; }
 #map { position: relative; height: 420px; margin-top: 6px; }
 #map .tile { position: absolute; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(127,127,127,.25); }
@@ -212,8 +212,8 @@ section.map { padding: 4px 20px 0; }
         <option value="savings">改善の余地 (合計節約 ms)</option>
       </select>
     </label>
-    <div class="legend">
-      <span>0</span><span class="bar"></span><span>100</span>
+    <div class="legend" title="標準スコア 90 を基準に ±7 点 (3σ) で赤↔緑へ遷移">
+      <span>83</span><span class="bar"></span><span>90</span><span class="bar"></span><span>97</span>
       <span class="none" title="エラー / 採点なし"></span><span>エラー</span>
     </div>
   </div>
