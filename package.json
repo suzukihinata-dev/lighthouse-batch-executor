@@ -4,6 +4,9 @@
   "description": "Run Lighthouse against every URL in a site's sitemap and export the results to CSV.",
   "type": "module",
   "private": true,
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=20"
   },
@@ -12,6 +15,7 @@
   },
   "scripts": {
     "dev": "tsx src/cli.ts",
+    "prepare": "npm run build",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/cli.js",
     "test": "vitest run test/unit",

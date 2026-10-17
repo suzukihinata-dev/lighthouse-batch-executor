@@ -10,6 +10,8 @@
  *   lighthouse-batch show <runId>
  */
 import { Command } from 'commander';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { buildRunCommand } from './commands/run.js';
 import { buildUrlsCommand } from './commands/urls.js';
 import { buildResumeCommand } from './commands/resume.js';
@@ -42,6 +44,17 @@ export async function main(argv: string[]): Promise<void> {
   }
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+// グローバルインストールでは bin がシンボリックリンク経由で起動されるため、
+// 実パスを解決してから自分自身の起動かを判定する
+function isDirectRun(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectRun()) {
   void main(process.argv);
 }

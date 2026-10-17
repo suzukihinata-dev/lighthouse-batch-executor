@@ -9,55 +9,84 @@
 - Node.js 20 以上 (Lighthouse 12 は Node >=18.16 を要求)
 - Google Chrome (システムにインストールされたものを使用。`CHROME_PATH` 環境変数で上書き可能)
 
-## セットアップ
+## インストール
+
+インストールすると `lighthouse-batch` コマンドが使えるようになります (ビルドは `prepare` スクリプトが自動で実行します)。
+
+### リポジトリからグローバルインストール
 
 ```sh
-npm install
-npm run build
+git clone <このリポジトリ>
+cd lighthouse-batch-executor
+npm install -g .
+lighthouse-batch --help
 ```
 
-開発中はビルドなしで `npm run dev -- --site ...` でも実行できます。
+更新するときは `git pull` 後に `npm install -g .` を再実行してください。
 
-## 使い方
-
-サブコマンド形式の CLI です。
+### 開発中に使う (リンク)
 
 ```sh
-node dist/cli.js run --site https://example.com
+cd lighthouse-batch-executor
+npm link
+```
+
+グローバルからリポジトリへシンボリックリンクが張られ、`npm run build` の成果物がそのまま使えます。修正後は `npm run build` だけで反映されます。外すときは `npm unlink -g lighthouse-batch` です。
+
+### tarball で配布する
+
+```sh
+npm pack                                   # lighthouse-batch-executor-0.1.0.tgz ができる
+npm install -g lighthouse-batch-executor-0.1.0.tgz   # 他のマシンで
+```
+
+### アンインストール
+
+```sh
+npm uninstall -g lighthouse-batch-executor
+```
+
+## クイックスタート
+
+```sh
+# 1. URL 収集だけ試す (計測しない)
+lighthouse-batch urls --site https://example.com --limit 5
+
+# 2. 小規模に計測する
+lighthouse-batch run --site https://example.com --limit 5 --runs 1 --strategy mobile
+
+# 3. 本番実行 (全 URL、モバイル・デスクトップ両方、3 回ずつ)
+lighthouse-batch run --site https://example.com
 ```
 
 `run` は指定サイトの `/sitemap.xml` (または robots.txt の `Sitemap:` 記述) から URL を収集し、各 URL をモバイル・デスクトップの両方で 3 回ずつ計測して、中央値を集約した `output/<実行ID>/results.csv` に出力します。
 
-### サブコマンド一覧
+## サブコマンド一覧
 
-| コマンド | 説明 |
-| --- | --- |
-| `run` | URL 収集から計測・CSV 出力までの全体実行 |
-| `urls` | URL 収集のみ (計測しない)。動作確認に使う |
+| コマンド         | 説明                                                       |
+| ---------------- | ---------------------------------------------------------- |
+| `run`            | URL 収集から計測・CSV 出力までの全体実行                   |
+| `urls`           | URL 収集のみ (計測しない)。動作確認に使う                  |
 | `resume [runId]` | 中断した実行を再開 (実行 ID 省略時は最新)。`--site` は不要 |
-| `list` | 出力ディレクトリ内の実行一覧と進捗を表示 |
-| `show <runId>` | 指定した実行の設定・結果サマリ・エラー一覧を表示 |
+| `list`           | 出力ディレクトリ内の実行一覧と進捗を表示                   |
+| `show <runId>`   | 指定した実行の設定・結果サマリ・エラー一覧を表示           |
 
 ```sh
-# 動作確認 (URL 収集だけ)
-node dist/cli.js urls --site https://example.com --limit 5
-
-# 小規模に計測
-node dist/cli.js run --site https://example.com --limit 5 --runs 1 --strategy mobile
-
 # 設定ファイルで実行
-node dist/cli.js run --config batch.json
+lighthouse-batch run --config batch.json
 
-# 中断からの再開
-node dist/cli.js resume                  # 最新の実行
-node dist/cli.js resume 20261017-183000
+# 中断からの再開 (Ctrl+C した後など)
+lighthouse-batch resume                  # 最新の実行
+lighthouse-batch resume 20261017-183000
 
 # 実行の一覧と結果の確認
-node dist/cli.js list
-node dist/cli.js show 20261017-183000
+lighthouse-batch list
+lighthouse-batch show 20261017-183000
 ```
 
-### 設定ファイル (`--config`)
+`--help` を付けると各コマンドのオプション一覧が表示されます。
+
+## 設定ファイル (`--config`)
 
 JSON 形式で繰り返し使う設定を切り出せます。優先順位は「CLI の明示指定 > 設定ファイル > 既定値」です。機密情報 (ヘッダー値・認証) は設定ファイルに書かず、CLI と環境変数で渡してください。
 
@@ -72,29 +101,41 @@ JSON 形式で繰り返し使う設定を切り出せます。優先順位は「
 }
 ```
 
-| キー | 型 | 既定 | 説明 |
-| --- | --- | --- | --- |
-| `site` | string | - | サイトのルート URL または sitemap.xml の URL |
-| `sitemap` | string | - | sitemap.xml の URL を明示指定 |
-| `strategy` | string | `both` | `mobile` / `desktop` / `both` |
-| `runs` | number | `3` | 1 (URL, strategy) あたりの計測回数 |
-| `concurrency` | number | `1` | 並列数 (既定は直列。並列化すると計測値がぶれる可能性あり) |
-| `retries` | number | `2` | リトライ回数 |
-| `delay` | number | `0` | URL 間の待機ミリ秒 |
-| `timeout` | number | `120000` | 1 計測のタイムアウト (ミリ秒) |
-| `include` | string[] | - | 対象に含める URL の glob パターン |
-| `exclude` | string[] | - | 対象から除外する URL の glob パターン |
-| `limit` | number | - | 計測する最大 URL 数 |
-| `userAgent` | string | - | User-Agent の上書き |
-| `noRaw` | boolean | `false` | 生 JSON の保存を行わない |
-| `output` | string | `output/<実行ID>/results.csv` | 出力 CSV のパス |
-| `bom` | boolean | `false` | CSV に BOM を付ける (Excel 対策) |
-| `allowExternalHosts` | boolean | `false` | sitemap 内の外部ホスト URL も計測する |
-| `outputDir` | string | `output` | 出力ディレクトリのルート |
+| キー                 | 型       | 既定                          | 説明                                                      |
+| -------------------- | -------- | ----------------------------- | --------------------------------------------------------- |
+| `site`               | string   | -                             | サイトのルート URL または sitemap.xml の URL              |
+| `sitemap`            | string   | -                             | sitemap.xml の URL を明示指定                             |
+| `strategy`           | string   | `both`                        | `mobile` / `desktop` / `both`                             |
+| `runs`               | number   | `3`                           | 1 (URL, strategy) あたりの計測回数                        |
+| `concurrency`        | number   | `1`                           | 並列数 (既定は直列。並列化すると計測値がぶれる可能性あり) |
+| `retries`            | number   | `2`                           | リトライ回数                                              |
+| `delay`              | number   | `0`                           | URL 間の待機ミリ秒                                        |
+| `timeout`            | number   | `120000`                      | 1 計測のタイムアウト (ミリ秒)                             |
+| `include`            | string[] | -                             | 対象に含める URL の glob パターン                         |
+| `exclude`            | string[] | -                             | 対象から除外する URL の glob パターン                     |
+| `limit`              | number   | -                             | 計測する最大 URL 数                                       |
+| `userAgent`          | string   | -                             | User-Agent の上書き                                       |
+| `noRaw`              | boolean  | `false`                       | 生 JSON の保存を行わない                                  |
+| `output`             | string   | `output/<実行ID>/results.csv` | 出力 CSV のパス                                           |
+| `bom`                | boolean  | `false`                       | CSV に BOM を付ける (Excel 対策)                          |
+| `allowExternalHosts` | boolean  | `false`                       | sitemap 内の外部ホスト URL も計測する                     |
+| `outputDir`          | string   | `output`                      | 出力ディレクトリのルート                                  |
 
 CLI オプションは設定ファイルのキーに対応します (`delay` → `--delay`、`userAgent` → `--user-agent`)。計測系 (`run` / `resume`) では `--header "Name: value"` も使えます。
 
 実行時の設定は (機密情報を除いて) 各実行ディレクトリに `config.json` として保存され、`resume` はこれを再利用します。
+
+## ベーシック認証
+
+認証情報は CLI 引数ではなく環境変数で渡します (シェル履歴・プロセス一覧への露出を避けるため)。
+
+```sh
+BASIC_AUTH_USER=user BASIC_AUTH_PASSWORD=pass lighthouse-batch run --site https://staging.example.com
+```
+
+認証情報・ヘッダーの値はログ・CSV・生 JSON に出力されません (`***` へマスク / 保存前に除去)。
+
+Bot 対策の突破 (CAPTCHA の回避など) は行いません。弾かれた URL は `status=error` として記録されます。
 
 ## 出力
 
@@ -136,13 +177,19 @@ audit の列は Lighthouse バージョンによって変わるため、最初�
 
 既定は直列実行 (concurrency 1) です。並列化 (`--concurrency`) は計測値のぶれを招く可能性があるため利用者の判断で行ってください。対象サイトへの負荷を抑えるには `--delay` で URL 間の待機を設定できます。
 
+目安: 100 URL × 2 strategy × 3 回 = 600 計測。1 計測を約 30 秒とすると約 5 時間 (直列時) です。
+
 ## 開発
 
+リポジトリをチェックアウトして開発する場合:
+
 ```sh
+npm install           # prepare で自動ビルドされる
 npm test              # 単体テスト (Lighthouse を起動しない)
 npm run test:integration  # 結合テスト (ローカルサーバー + 実 Lighthouse。遅い)
 npm run lint          # eslint + prettier
 npm run build         # tsc によるビルド
+npm run dev -- run --site https://example.com --limit 2   # ビルドなしで実行
 ```
 
 - ドキュメント: [要件定義書](docs/REQUIREMENTS.md) / [実装計画書](docs/PLAN.md)
