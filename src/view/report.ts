@@ -159,9 +159,8 @@ td.url a { color: inherit; }
 .status.partial { color: #9a7212; }
 .status.error { color: #c5303a; }
 .score { font-variant-numeric: tabular-nums; }
-.score.s90 { color: #147d3a; font-weight: 600; }
-.score.s50 { color: #9a7212; font-weight: 600; }
-.score.s0 { color: #c5303a; font-weight: 600; }
+/* スコアのハイライトはトレリーマップと同じ色分布 (基準 90 ±7 点) を JS で付ける */
+.pill { display: inline-block; min-width: 2.4em; padding: 1px 7px; border-radius: 9px; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
 tr.detail-row > td { background: #8881; white-space: normal; }
 dl { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0; }
 dt { color: gray; } dt::after { content: ":"; }
@@ -264,7 +263,12 @@ function fmtBytes(v) {
   return v + ' B';
 }
 function fmtNum(v) { return v == null ? '' : String(Math.round(v * 100) / 100); }
-function scoreClass(v) { return v == null ? '' : v >= 90 ? 's90' : v >= 50 ? 's50' : 's0'; }
+// スコアのハイライト: トレリーマップと同じ色分布 (scoreColor / textOn は埋め込み済み)
+function scorePill(v) {
+  if (v == null) return '';
+  var bg = scoreColor(v);
+  return '<span class="pill" style="background:' + bg + ';color:' + textOn(bg) + '">' + v + '</span>';
+}
 function esc(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
@@ -286,7 +290,8 @@ function detailInner(row) {
   }).join('');
   var html = '<dl>' +
     '<dt>status</dt><dd class="status ' + row.status + '">' + row.status + '</dd>' +
-    '<dt>総合得点</dt><dd>' + (overallScore(row.scores) == null ? '—' : overallScore(row.scores)) + ' / 100</dd>' +
+    '<dt>総合得点</dt><dd>' + scorePill(overallScore(row.scores)) + '</dd>' +
+    '<dt>カテゴリ</dt><dd>Perf ' + scorePill(row.scores.performance) + ' A11y ' + scorePill(row.scores.accessibility) + ' BP ' + scorePill(row.scores.best_practices) + ' SEO ' + scorePill(row.scores.seo) + '</dd>' +
     '<dt>runs</dt><dd>' + row.runsSucceeded + ' / ' + row.runsTotal + '</dd>' +
     '<dt>final_url</dt><dd>' + esc(row.finalUrl) + '</dd>' +
     '<dt>fetched_at</dt><dd>' + esc(row.fetchedAt) + '</dd>' +
@@ -349,10 +354,10 @@ function shortUrl(url) {
 }
 function tipHtml(row) {
   var s = row.scores;
-  function cell(v) { return v == null ? '—' : v; }
+  function pill(v) { return scorePill(v) || '—'; }
   return '<div class="u">' + esc(row.url) + '</div>' +
-    '<div>' + esc(row.strategy) + ' ・ ' + row.status + ' ・ 総合 ' + (overallScore(s) == null ? '—' : overallScore(s)) + '</div>' +
-    '<div>Perf ' + cell(s.performance) + ' / A11y ' + cell(s.accessibility) + ' / BP ' + cell(s.best_practices) + ' / SEO ' + cell(s.seo) + '</div>' +
+    '<div>' + esc(row.strategy) + ' ・ ' + row.status + ' ・ 総合 ' + pill(overallScore(s)) + '</div>' +
+    '<div>Perf ' + pill(s.performance) + ' A11y ' + pill(s.accessibility) + ' BP ' + pill(s.best_practices) + ' SEO ' + pill(s.seo) + '</div>' +
     (row.error ? '<div>' + esc(row.error.slice(0, 80)) + '</div>' : '');
 }
 function renderMap() {
@@ -406,7 +411,7 @@ function render() {
       '<td>' + esc(row.strategy) + '</td>' +
       '<td class="status ' + row.status + '">' + row.status + '</td>' +
       ['performance', 'accessibility', 'best_practices', 'seo'].map(function (k) {
-        return '<td class="score ' + scoreClass(s[k]) + '">' + (s[k] == null ? '' : s[k]) + '</td>';
+        return '<td class="score">' + scorePill(s[k]) + '</td>';
       }).join('') +
       '<td>' + fmtMs(row.metrics.fcp_ms) + '</td>' +
       '<td>' + fmtMs(row.metrics.lcp_ms) + '</td>' +
